@@ -1,0 +1,193 @@
+version: 1
+metadata:
+  ota:
+    minimum_version: "1.6.20"
+project:
+  name: ollama
+  description: Ollama readiness slice covering native source build, Go test, and local serve proof from repository source
+  type: application
+execution:
+  default_context: host
+  contexts:
+    host:
+      backend: native
+toolchains:
+  go:
+    version: "1.26.0"
+    fulfillment:
+      source: go
+      mode: none
+tools:
+  cmake:
+    version: ">=3.24"
+surfaces:
+  api:
+    kind: http
+    port: 11434
+    path: /api/version
+    readiness:
+      kind: http
+      method: GET
+      path: /api/version
+      success:
+        status:
+          - 200
+      body:
+        contains: '"version"'
+      interval: 5s
+      timeout: 3s
+      retries: 36
+      start_period: 10s
+tasks:
+  setup:
+    context: host
+    description: Download Go module dependencies for the source tree
+    category: setup
+    run: go mod download
+    requirements:
+      toolchains:
+        - go
+    effects:
+      network: true
+      network_kind: dependency_hydration
+    notes: |
+      This is the narrow module setup path for the selected source-build slice.
+      The broader release and GPU backend matrix is intentionally out of scope for this contract.
+    internal: true
+  build:
+    context: host
+    description: Build the native source tree from repository root
+    category: build
+    run: cmake -B build . && cmake --build build --parallel 8
+    depends_on:
+      - setup
+    requirements:
+      toolchains:
+        - go
+      tools:
+        cmake: ">=3.24"
+    effects:
+      writes:
+        - build
+        - ollama
+    notes: |
+      This follows the documented native build model in `docs/development.md`.
+      Compiler prerequisites remain repo truth for this slice and are not flattened into fake generic tool claims.
+  test:
+    context: host
+    description: Run the repository Go test suite
+    category: test
+    run: go test ./...
+    depends_on:
+      - setup
+    requirements:
+      toolchains:
+        - go
+    safe_for_agent: true
+    notes: |
+      This maps to the documented test path in `docs/development.md`.
+  verify:
+    context: host
+    description: Aggregate the proven native source-build verification path
+    category: test
+    run: "true"
+    depends_on:
+      - build
+      - test
+    requirements:
+      toolchains:
+        - go
+      tools:
+        cmake: ">=3.24"
+    safe_for_agent: true
+    notes: |
+      Contract-level verification path for the selected native source-build slice.
+      It intentionally does not claim GPU backend coverage or the broader release packaging matrix.
+  serve:
+    context: host
+    description: Start Ollama from the repository build output
+    category: dev
+    run: ./ollama serve
+    depends_on:
+      - build
+    requirements:
+      toolchains:
+        - go
+      tools:
+        cmake: ">=3.24"
+    runtime:
+      kind: service
+      surfaces:
+        api:
+          project:
+            host:
+              primary: true
+    notes: |
+      This proves the local native `serve` path after a repository build.
+      It is not the packaged installer path and it is not a claim about Docker image deployment.
+workflows:
+  default: verify
+  verify:
+    description: Canonical native source-build verification path for this contract slice
+    setup:
+      task: setup
+    run:
+      task: verify
+    notes: |
+      Use `ota up --workflow verify` to run dependency hydration, source build, and Go test through one declared path.
+  app:
+    description: Canonical local runtime proof path for repository-built Ollama
+    setup:
+      task: setup
+    run:
+      task: serve
+    readiness:
+      surfaces:
+        - api
+    notes: |
+      Use `ota proof runtime --workflow app` to prove that the repository build becomes a reachable local API on `/api/version`.
+agent:
+  posture: readiness_strict
+  entrypoint: setup
+  default_task: verify
+  safe_tasks:
+    - test
+    - verify
+  verify_after_changes:
+    - verify
+  writable_paths:
+    - app
+    - build
+    - cmd
+    - convert
+    - docs
+    - envconfig
+    - fs
+    - kvcache
+    - llama
+    - ml
+    - model
+    - ollama
+    - parser
+    - progress
+    - readline
+    - runner
+    - sample
+    - scripts
+    - server
+    - template
+    - types
+    - version
+    - x
+  protected_paths:
+    - .github/workflows
+    - go.mod
+    - go.sum
+    - ota.yaml
+  notes: |
+    Use `ota doctor` first to inspect host prerequisites for this native source-build slice.
+    Use `ota up --workflow verify` for dependency hydration, native build, and Go test.
+    Use `ota proof runtime --workflow app` to prove the local API runtime path.
+    This pressure branch depends on unreleased Ota contract surfaces until `1.6.20` ships, so keep
+    source-install proof in the matrix instead of teaching released bootstrap commands yet.
+    Use `ota tasks --use` last to inspect the rest of the declared task surface.

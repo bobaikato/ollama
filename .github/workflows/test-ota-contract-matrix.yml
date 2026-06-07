@@ -1,0 +1,163 @@
+
+name: "Test: Ota contract matrix"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ota_repository:
+        description: Ota source repository to build for this matrix run
+        required: false
+        default: bobaikato/ota
+      ota_ref:
+        description: Ota branch, tag, or commit to build for this matrix run
+        required: false
+        default: 1.6.20-implementation
+  pull_request:
+    paths:
+      - "ota.yaml"
+      - ".github/workflows/test-ota-contract-matrix.yml"
+  push:
+    paths:
+      - "ota.yaml"
+      - ".github/workflows/test-ota-contract-matrix.yml"
+
+concurrency:
+  group: ota-contract-matrix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  OTA_NO_UPDATE_CHECK: "1"
+
+jobs:
+  native:
+    name: Ota Contract Matrix (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-full
+            os: ubuntu-latest
+            full_proof: true
+          - name: macos-dry
+            os: macos-latest
+            full_proof: false
+          - name: windows-dry
+            os: windows-latest
+            full_proof: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Go 1.26
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.0"
+
+      - name: Verify CMake availability
+        shell: bash
+        run: cmake --version
+
+      - name: Install ota from source
+        uses: ota-run/ota/.github/actions/install-ota-from-source@v1.6.19
+        with:
+          repository: ${{ github.event.inputs.ota_repository || 'bobaikato/ota' }}
+          ref: ${{ github.event.inputs.ota_ref || '1.6.20-implementation' }}
+
+      - name: Assert ota minimum version from contract
+        shell: bash
+        run: |
+          ota --version | tee ota-version.txt
+          required="$(awk -F'"' '/minimum_version:/{print $2; exit}' ota.yaml)"
+          if [ -z "$required" ]; then
+            echo "missing metadata.ota.minimum_version in ota.yaml"
+            exit 1
+          fi
+          node - "$required" "$(cat ota-version.txt)" <<'JS'
+          const required = process.argv[2];
+          const versionLine = process.argv[3];
+          const match = versionLine.match(/v(\d+\.\d+\.\d+)/);
+          if (!match) {
+            console.error(`unable to parse ota version from: ${versionLine}`);
+            process.exit(1);
+          }
+          const current = match[1];
+          const toParts = (v) => v.split('.').map((x) => Number.parseInt(x, 10));
+          const compare = (a, b) => {
+            const ap = toParts(a);
+            const bp = toParts(b);
+            for (let i = 0; i < 3; i += 1) {
+              const diff = (ap[i] || 0) - (bp[i] || 0);
+              if (diff !== 0) return diff;
+            }
+            return 0;
+          };
+          if (compare(current, required) < 0) {
+            console.error(`installed ota ${current} does not satisfy minimum_version ${required}`);
+            process.exit(1);
+          }
+          JS
+
+      - name: Validate contract
+        shell: bash
+        run: |
+          ota validate --json . > ota-validate.json
+          ota validate .
+
+      - name: Doctor contract
+        shell: bash
+        run: ota doctor .
+
+      - name: List task surfaces
+        shell: bash
+        run: |
+          ota tasks --use .
+          ota tasks --safe --use .
+          ota tasks --unsafe --use .
+
+      - name: List workflows
+        shell: bash
+        run: ota workflows .
+
+      - name: Export execution topology
+        shell: bash
+        run: ota execution topology --json . > ota-execution-topology.json
+
+      - name: Dry-run verify workflow
+        shell: bash
+        run: ota up --workflow verify --native --dry-run .
+
+      - name: Dry-run app workflow
+        shell: bash
+        run: ota proof runtime --workflow app --native --dry-run --json . > ota-proof-app-dry-run.json
+
+      - name: Execute verify workflow (Ubuntu)
+        if: ${{ matrix.full_proof }}
+        timeout-minutes: 90
+        shell: bash
+        run: ota up --workflow verify --native --stream .
+
+      - name: Proof runtime workflow (Ubuntu)
+        if: ${{ matrix.full_proof }}
+        timeout-minutes: 60
+        shell: bash
+        run: ota proof runtime --workflow app --native --json . > ota-proof-app.json
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota-contract-matrix-${{ matrix.name }}
+          path: |
+            ota-version.txt
+            ota-validate.json
+            ota-execution-topology.json
+            ota-proof-app-dry-run.json
+            ota-proof-app.json
