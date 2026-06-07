@@ -35,7 +35,7 @@ jobs:
   native:
     name: Ota Contract Matrix (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -43,12 +43,12 @@ jobs:
           - name: ubuntu-full
             os: ubuntu-latest
             full_proof: true
-          - name: macos-dry
+          - name: macos-full
             os: macos-latest
-            full_proof: false
-          - name: windows-dry
+            full_proof: true
+          - name: windows-full
             os: windows-latest
-            full_proof: false
+            full_proof: true
 
     steps:
       - name: Checkout
