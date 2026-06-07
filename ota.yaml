@@ -105,14 +105,12 @@ tasks:
       It intentionally does not claim GPU backend coverage or the broader release packaging matrix.
   serve:
     context: host
-    description: Start Ollama from the repository build output
+    description: Start Ollama through the documented Go runtime path against an existing native payload
     category: dev
-    run: ./ollama serve
+    run: go run . serve
     requirements:
       toolchains:
         - go
-      tools:
-        cmake: ">=3.24"
     runtime:
       kind: service
       surfaces:
@@ -121,8 +119,9 @@ tasks:
             host:
               primary: true
     notes: |
-      This proves the local native `serve` path after a repository build.
-      It is not the packaged installer path and it is not a claim about Docker image deployment.
+      This proves the documented pure-Go runtime path against an existing native payload.
+      It is not the packaged installer path, it is not a claim about Docker image deployment,
+      and it assumes the native payload has already been built for the current checkout.
 workflows:
   default: verify
   verify:
@@ -134,7 +133,7 @@ workflows:
     notes: |
       Use `ota up --workflow verify` to run dependency hydration, source build, and Go test through one declared path.
   app:
-    description: Canonical local runtime proof path for repository-built Ollama
+    description: Canonical local runtime proof path for the documented Go serve flow against an existing native payload
     setup:
       task: setup
     run:
@@ -143,7 +142,8 @@ workflows:
       surfaces:
         - api
     notes: |
-      Use `ota proof runtime --workflow app` to prove that an already-built repository checkout becomes a reachable local API on `/api/version`.
+      Use `ota proof runtime --workflow app` to prove that the documented `go run . serve`
+      path becomes a reachable local API on `/api/version` once the native payload already exists.
 agent:
   posture: readiness_strict
   entrypoint: setup
