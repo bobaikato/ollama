@@ -138,7 +138,7 @@ workflows:
   app:
     description: Canonical local runtime proof path for repository-built Ollama
     setup:
-      task: setup
+      task: build
     run:
       task: serve
     readiness:

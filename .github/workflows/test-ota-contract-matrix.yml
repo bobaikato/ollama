@@ -156,3 +156,6 @@ jobs:
             ota-validate.json
             ota-execution-topology.json
             ota-proof-app.json
+            .ota/proof/app/topology.json
+            .ota/proof/app/doctor.json
+            .ota/proof/app/up.log
