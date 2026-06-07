@@ -108,8 +108,6 @@ tasks:
     description: Start Ollama from the repository build output
     category: dev
     run: ./ollama serve
-    depends_on:
-      - build
     requirements:
       toolchains:
         - go
