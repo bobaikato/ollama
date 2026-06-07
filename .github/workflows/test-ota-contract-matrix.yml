@@ -134,10 +134,6 @@ jobs:
         shell: bash
         run: ota up --workflow verify --native --dry-run .
 
-      - name: Dry-run app workflow
-        shell: bash
-        run: ota proof runtime --workflow app --native --dry-run --json . > ota-proof-app-dry-run.json
-
       - name: Execute verify workflow (Ubuntu)
         if: ${{ matrix.full_proof }}
         timeout-minutes: 90
@@ -159,5 +155,4 @@ jobs:
             ota-version.txt
             ota-validate.json
             ota-execution-topology.json
-            ota-proof-app-dry-run.json
             ota-proof-app.json
