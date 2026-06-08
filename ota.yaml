@@ -43,7 +43,12 @@ tasks:
     context: host
     description: Download Go module dependencies for the source tree
     category: setup
-    run: go mod download
+    prepare:
+      kind: dependency_hydration
+      medium: package_dependencies
+      source:
+        kind: go_modules
+        cwd: .
     requirements:
       toolchains:
         - go
