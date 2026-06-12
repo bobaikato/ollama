@@ -92,18 +92,12 @@ tasks:
     notes: |
       This maps to the documented test path in `docs/development.md`.
   verify:
-    context: host
     description: Aggregate the proven native source-build verification path
     category: test
-    run: "true"
-    depends_on:
-      - build
-      - test
-    requirements:
-      toolchains:
-        - go
-      tools:
-        cmake: ">=3.24"
+    aggregate:
+      tasks:
+        - build
+        - test
     safe_for_agent: true
     notes: |
       Contract-level verification path for the selected native source-build slice.
@@ -112,7 +106,13 @@ tasks:
     context: host
     description: Start Ollama through the documented Go runtime path against an existing native payload
     category: dev
-    run: go run . serve
+    launch:
+      kind: command
+      exe: go
+      args:
+        - run
+        - .
+        - serve
     requirements:
       toolchains:
         - go
