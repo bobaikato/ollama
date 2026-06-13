@@ -191,6 +191,6 @@ agent:
     Use `ota doctor` first to inspect host prerequisites for this native source-build slice.
     Use `ota up --workflow verify` for dependency hydration, native build, and Go test.
     Use `ota proof runtime --workflow app` to prove the local API runtime path.
-    This pressure branch depends on unreleased Ota contract surfaces until `1.6.20` ships, so keep
-    source-install proof in the matrix instead of teaching released bootstrap commands yet.
+    This pressure branch depends on Ota `1.6.20` contract surfaces, so keep the matrix pinned to
+    released `1.6.20` or newer instead of falling back to source-install proof.
     Use `ota tasks --use` last to inspect the rest of the declared task surface.
